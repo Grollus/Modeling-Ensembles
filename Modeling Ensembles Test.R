@@ -48,4 +48,24 @@ model_rpart <- train(ensembleData[, predictors], ensembleData[, labelName],
 model_treebag <- train(ensembleData[, predictors], ensembleData[, labelName],
                        method = 'treebag', trControl = myControl)
 
+#Blending the three models together
+#Use blenderData and testingData so we can harvest predictions from both sets
+#So we can add the predictions as new features to the same data sets
+#Three models means three new columns to both
+blenderData$gbm_PROB <- predict(object = model_gbm, blenderData[, predictors])
+blenderData$rf_PROB <- predict(object = model_rpart, blenderData[, predictors])
+blenderData$treebag_PROB <- predict(object = model_treebag, blenderData[, predictors])
 
+testingData$gbm_PROB <- predict(object = model_gbm, testingData[, predictors])
+testingData$rf_PROB <- predict(object = model_rpart, testingData[, predictors])
+testingData$treebag_PROB <- predict(object = model_treebag, testingData[, predictors])
+
+#Now you train a final blended model on the old data and the new predictions
+predictors <- names(blenderData)[names(blenderData) != labelName]
+final_blender_model <- train(blenderData[, predictors], blenderData[, labelName], 
+                             method = 'gbm', trControl = myControl)
+
+#Now we predict and see how the model did
+preds <- predict(object = final_blender_model, testingData[, predictors])
+auc <- roc(testingData[, labelName], preds)
+print(auc$auc)
